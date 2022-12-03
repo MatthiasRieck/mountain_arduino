@@ -92,7 +92,7 @@ void processTargetBlending() {
 
 
 void setup() {
-  pinMode(D1, INPUT);
+  pinMode(D2, INPUT_PULLUP);
 
   for (int i = 0; i < PIXEL_COUNT; i++) {
     pixels_curr[i] = HslColor(0, 0, 0);
@@ -133,12 +133,12 @@ void loop()
 
     //l_gain = (digitalRead(D2) == HIGH) ? 0.5 : 0.0;
 
-     if (digitalRead(D2) == HIGH) {    
+     if (digitalRead(D2) == LOW) {    
       aButtonPressed = true;                   
       delay(10);                   
     }
 
-  if (digitalRead(D2) == LOW && aButtonPressed == true) { 
+  if (digitalRead(D2) == HIGH && aButtonPressed == true) { 
     aButtonPressed = false;  
     fireMode = !fireMode;                                  
   }
