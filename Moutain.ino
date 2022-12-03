@@ -24,9 +24,9 @@ NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PIXEL_COUNT, PIXEL_PIN);
 HslColor pixels_curr[PIXEL_COUNT];
 HslColor pixels_target[PIXEL_COUNT];
 HslColor pixels_start[PIXEL_COUNT];
-float blend_start[PIXEL_COUNT];
-float blend_in[PIXEL_COUNT];
-float blend_out[PIXEL_COUNT];
+int blend_start[PIXEL_COUNT];
+int blend_in[PIXEL_COUNT];
+int blend_out[PIXEL_COUNT];
 
 HslColor addBlendHslColors(HslColor colors[], float alphas[]) {
   float h = 0;
@@ -44,7 +44,7 @@ HslColor addBlendHslColors(HslColor colors[], float alphas[]) {
   return HslColor(h/alpha, s/alpha, l/alpha);
 }
 
-HslColor linearBlendHslColor(HslColor c_start, HslColor c_target, float start, float target) {
+HslColor linearBlendHslColor(HslColor c_start, HslColor c_target, int start, int target) {
   float alpha_target = (float)(-start)/(float)(target-start);
 
   if (alpha_target < 0) alpha_target = 0;
@@ -59,31 +59,15 @@ HslColor linearBlendHslColor(HslColor c_start, HslColor c_target, float start, f
   );
 }
 
-
-// HslColor linearBlendHslColorAlpha(HslColor c_start, HslColor c_target, float alpha_start) {
-
-//   if (alpha_start < 0) alpha_start = 0;
-//   if (alpha_start > 1) alpha_start = 1;
-
-//   float alpha_target = 1-alpha_start;
-
-//   return HslColor(
-//     c_start.H*alpha_start + c_target.H*alpha_target,
-//     c_start.S*alpha_start + c_target.S*alpha_target,
-//     c_start.L*alpha_start + c_target.L*alpha_target
-//   );
-// }
-
 void processTargetBlending() {
   for (int i = 0; i < PIXEL_COUNT; i++) {
     if (blend_in[i] <= 0) continue;
 
     pixels_curr[i] = linearBlendHslColor(pixels_start[i], pixels_target[i], blend_start[i], blend_in[i]);
 
-
-    blend_start[i] = blend_start[i] - (float)TIME_STEP;
-    blend_in[i] = blend_in[i] -  (float)TIME_STEP;
-    blend_out[i] = blend_out[i] -  (float)TIME_STEP;
+    blend_start[i] -= TIME_STEP;
+    blend_in[i] -= TIME_STEP;
+    blend_out[i] -= TIME_STEP;
 
     if (blend_in[i] <= 0) {
       if (blend_out[i] > 0) {
@@ -144,11 +128,8 @@ void loop()
     calculate_flames();
 
     for (int i=0; i< PIXEL_COUNT; i++) {
-      //HslColor col = linearBlendHslColorAlpha(HslColor(0,1,0.5), HslColor(1,1,0.5), (sin((float)i/(float)5+offset)+1.0)/2.0);
       HslColor col = pixels_curr[i];
       strip.SetPixelColor(i, HslColor(col.H, col.S, col.L*l_gain));
     }
     strip.Show();
-
-    offset += 0.1;
 }
