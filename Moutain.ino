@@ -92,6 +92,8 @@ void processTargetBlending() {
 
 
 void setup() {
+  pinMode(D1, INPUT);
+
   for (int i = 0; i < PIXEL_COUNT; i++) {
     pixels_curr[i] = HslColor(0, 0, 0);
     pixels_start[i] = HslColor(0, 0, 0);
@@ -121,18 +123,39 @@ void calculate_flames() {
     processTargetBlending();    
 }
 
-float offset = 0;
+bool aButtonPressed = false;
+bool fireMode = false;
 
 void loop()
 {
-    float l_gain = 1;
-    delay(TIME_STEP);
+    float l_gain = analogRead(A0)/1023.0;
+    if (l_gain < 0.1) l_gain = 0.1;
 
-    calculate_flames();
+    //l_gain = (digitalRead(D2) == HIGH) ? 0.5 : 0.0;
 
-    for (int i=0; i< PIXEL_COUNT; i++) {
-      HslColor col = pixels_curr[i];
-      strip.SetPixelColor(i, HslColor(col.H, col.S, col.L*l_gain));
+     if (digitalRead(D2) == HIGH) {    
+      aButtonPressed = true;                   
+      delay(10);                   
     }
+
+  if (digitalRead(D2) == LOW && aButtonPressed == true) { 
+    aButtonPressed = false;  
+    fireMode = !fireMode;                                  
+  }
+
+    if (fireMode) { 
+      calculate_flames();
+      for (int i=0; i< PIXEL_COUNT; i++) {
+        HslColor col = pixels_curr[i];
+        strip.SetPixelColor(i, HslColor(col.H, col.S, col.L*l_gain));
+      }
+    } else {
+      for (int i=0; i< PIXEL_COUNT; i++) {
+        strip.SetPixelColor(i, HslColor(30.0/360.0, 0.8, 0.5*l_gain));
+      }
+    }
+    
     strip.Show();
+
+    delay(TIME_STEP);
 }
