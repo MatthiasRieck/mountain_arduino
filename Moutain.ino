@@ -13,75 +13,78 @@
 
 #include <NeoPixelBus.h>
 
+const uint16_t PIXEL_COUNT = 148; 
+const uint8_t PIXEL_PIN = 2;
+const uint16_t TIME_STEP = 50;
 
-const int maxnum = 148;
+NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PIXEL_COUNT, PIXEL_PIN);
 
-const uint16_t PixelCount = maxnum; // this example assumes 4 pixels, making it smaller will cause a failure
-const uint8_t PixelPin = 2;  // make sure to set this to the correct pin, ignored for Esp8266
+HslColor pixels_curr[PIXEL_COUNT];
+HslColor pixels_target[PIXEL_COUNT];
+HslColor pixels_start[PIXEL_COUNT];
+int blend_start[PIXEL_COUNT];
+int blend_curr[PIXEL_COUNT];
+int blend_in[PIXEL_COUNT];
+int blend_out[PIXEL_COUNT];
 
-#define colorSaturation 128
+HslColor addBlendHslColors(HslColor colors[], float alphas[]) {
+  float h = 0;
+  float s = 0;
+  float l = 0;
+  float alpha = 0;
 
-// three element pixels, in different order and speeds
-NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
-//NeoPixelBus<NeoRgbFeature, Neo400KbpsMethod> strip(PixelCount, PixelPin);
+  for (int i = 0; i < PIXEL_COUNT; i++) {
+    h += colors[i].H;
+    s += colors[i].S;
+    l += colors[i].L;
+    alpha += alphas[i];
+  }
 
-// For Esp8266, the Pin is omitted and it uses GPIO3 due to DMA hardware use.  
-// There are other Esp8266 alternative methods that provide more pin options, but also have
-// other side effects.
-// For details see wiki linked here https://github.com/Makuna/NeoPixelBus/wiki/ESP8266-NeoMethods.
+  return HslColor(h/alpha, s/alpha, l/alpha);
+}
 
-// You can also use one of these for Esp8266, 
-// each having their own restrictions.
-//
-// These two are the same as above as the DMA method is the default.
-// NOTE: These will ignore the PIN and use GPI03 pin.
-//NeoPixelBus<NeoGrbFeature, NeoEsp8266Dma800KbpsMethod> strip(PixelCount, PixelPin);
-//NeoPixelBus<NeoRgbFeature, NeoEsp8266Dma400KbpsMethod> strip(PixelCount, PixelPin);
+HslColor linearBlendHslColor(HslColor c_start, HslColor c_target, int start, int curr, int target) {
+  float alpha_start = (float)(curr-start)/(float)(target-start);
+  float alpha_target = 1-alpha_start;
 
-// Uart method is good for the Esp-01 or other pin restricted modules.
-// for details see wiki linked here https://github.com/Makuna/NeoPixelBus/wiki/ESP8266-NeoMethods.
-// NOTE: These will ignore the PIN and use GPI02 pin.
-//NeoPixelBus<NeoGrbFeature, NeoEsp8266Uart1800KbpsMethod> strip(PixelCount, PixelPin);
-//NeoPixelBus<NeoRgbFeature, NeoEsp8266Uart1400KbpsMethod> strip(PixelCount, PixelPin);
+  return HslColor(
+    c_start.H*alpha_start + c_target.H*alpha_target,
+    c_start.S*alpha_start + c_target.S*alpha_target,
+    c_start.L*alpha_start + c_target.L*alpha_target
+  );
+}
 
-// The bitbang method is really only good if you are not using WiFi features of the ESP.
-// It works with all but pin 16.
-//NeoPixelBus<NeoGrbFeature, NeoEsp8266BitBang800KbpsMethod> strip(PixelCount, PixelPin);
-//NeoPixelBus<NeoRgbFeature, NeoEsp8266BitBang400KbpsMethod> strip(PixelCount, PixelPin);
+void processTargetBlending() {
+  for (int i = 0; i < PIXEL_COUNT; i++) {
+    HslColor curr_color = linearBlendHslColor(pixels_start[i], pixels_target[i], blend_start[i], blend_curr[i], blend_in[i]);
 
-// four element pixels, RGBW
-//NeoPixelBus<NeoRgbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
-
-RgbColor red(226, 88, 34);
-RgbColor green(230, 41, 44);
-RgbColor blue(255, 165, 0);
-
-
-void setup()
-{
-    Serial.begin(115200);
-    while (!Serial); // wait for serial attach
-
-    Serial.println();
-    Serial.println("Initializing...");
-    Serial.flush();
-
-    // this resets all the neopixels to an off state
-    strip.Begin();
-    strip.Show();
+  }
+}
 
 
-    Serial.println();
-    Serial.println("Running...");
+void setup() {
+  for (int i = 0; i < PIXEL_COUNT; i++) {
+    pixels_curr[i] = HslColor(0, 0, 0);
+    pixels_start[i] = HslColor(0, 0, 0);
+    pixels_target[i] = HslColor(0, 0, 0);
+  }
+}
+
+void calculate_flames() {
+    
 }
 
 
 void loop()
 {
+    float l_gain = 0.5;
     delay(50);
 
-    for (int i=0; i< maxnum; i++) {
-      strip.SetPixelColor(i, RgbColor(random(255), random(255), random(255)));
+    calculate_flames();
+
+    for (int i=0; i< PIXEL_COUNT; i++) {
+      HslColor col = pixels_curr[i];
+      strip.SetPixelColor(i, HslColor(col.H, col.S, col.L*l_gain));
     }
     strip.Show();
 
