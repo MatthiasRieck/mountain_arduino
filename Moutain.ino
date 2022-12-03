@@ -112,7 +112,7 @@ void calculate_flames() {
        pixels_start[index] = pixels_curr[index];
      else
       pixels_start[index] = pixel_off;
-    pixels_target[index] = fire_on;
+    pixels_target[index] = HslColor((5.0+(float)random(10))/360.0, 1, 50.0/100.0);
     blend_start[index] = 0.0;
     int intime = random(300)+200;
     blend_in[index] = intime;
