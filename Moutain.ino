@@ -13,7 +13,7 @@
 
 #include <NeoPixelBus.h>
 
-const uint16_t PIXEL_COUNT = 20; 
+const uint16_t PIXEL_COUNT = 148; 
 const uint8_t PIXEL_PIN = 2;
 const uint16_t TIME_STEP = 50;
 
@@ -55,15 +55,16 @@ HslColor linearBlendHslColor(HslColor c_start, HslColor c_target, int start, int
   return HslColor(
     c_start.H*alpha_start + c_target.H*alpha_target,
     c_start.S*alpha_start + c_target.S*alpha_target,
-    c_start.L*alpha_start + c_target.L*alpha_target
+    max(c_start.L*alpha_start + c_target.L*alpha_target, (float)0.5)
   );
 }
 
 void processTargetBlending() {
   for (int i = 0; i < PIXEL_COUNT; i++) {
-    if (blend_in[i] < 0) continue;
+    if (blend_in[i] <= 0) continue;
 
-    HslColor curr_color = linearBlendHslColor(pixels_start[i], pixels_target[i], blend_start[i], blend_in[i]);
+    pixels_curr[i] = linearBlendHslColor(pixels_start[i], pixels_target[i], blend_start[i], blend_in[i]);
+
 
     blend_start[i] -= TIME_STEP;
     blend_in[i] -= TIME_STEP;
@@ -81,17 +82,30 @@ void processTargetBlending() {
 
 
 void setup() {
-  // for (int i = 0; i < PIXEL_COUNT; i++) {
-  //   pixels_curr[i] = HslColor(0, 0, 0);
-  //   pixels_start[i] = HslColor(0, 0, 0);
-  //   pixels_target[i] = HslColor(0, 0, 0);
-  // }
+  for (int i = 0; i < PIXEL_COUNT; i++) {
+    pixels_curr[i] = HslColor(0, 0, 0);
+    pixels_start[i] = HslColor(0, 0, 0);
+    pixels_target[i] = HslColor(0, 0, 0);
+    blend_in[i] = 0;
+    blend_out[i] = 0;
+  }
+  strip.Begin();
+  for (int i=0; i< PIXEL_COUNT; i++) {
+      strip.SetPixelColor(i, pixels_curr[i]);
+    }
+  strip.Show();
 }
 
 void calculate_flames() {
     uint16_t index = random(PIXEL_COUNT);
+    // if (pixels_curr[index].L > 0)
+    //   pixels_start[index] = pixels_curr[index];
+    // else
+    pixels_start[index] = HslColor(1, 1, 0);
+
     pixels_target[index] = HslColor(1, 1, 0.5);
     blend_in[index] = 1000;
+    blend_out[index] = 2000;
 
     processTargetBlending();    
 }
@@ -99,20 +113,14 @@ void calculate_flames() {
 
 void loop()
 {
-    float l_gain = 0.5;
+    float l_gain = 0.2;
     delay(TIME_STEP);
 
-    //calculate_flames();
+    calculate_flames();
 
     for (int i=0; i< PIXEL_COUNT; i++) {
-      //HslColor col = pixels_curr[i];
-      strip.SetPixelColor(i, HslColor(1,1,0.5));//col.H, col.S, col.L*l_gain));
+      HslColor col = pixels_curr[i];
+      strip.SetPixelColor(i, HslColor(col.H, col.S, col.L*l_gain));
     }
     strip.Show();
-
-
-
-
-
-
 }
