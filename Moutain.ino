@@ -15,9 +15,11 @@
 
 const uint16_t PIXEL_COUNT = 148; 
 const uint8_t PIXEL_PIN = 2;
-const uint16_t TIME_STEP = 20;
+const uint16_t TIME_STEP = 10;
 
-HslColor pixel_off(1,1,0);
+HslColor fire_on(10.0/360.0, 1, 50.0/100.0);
+
+HslColor pixel_off(10.0/360.0, 1, 0);
 
 NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PIXEL_COUNT, PIXEL_PIN);
 
@@ -106,14 +108,15 @@ void setup() {
 
 void calculate_flames() {
     uint16_t index = random(PIXEL_COUNT);
-    // if (pixels_curr[index].L > 0)
-    //   pixels_start[index] = pixels_curr[index];
-    // else
-    pixels_start[index] = HslColor(1, 1, 0);
-    pixels_target[index] = HslColor(1, 1, 0.5);
+     if (pixels_curr[index].L > 0)
+       pixels_start[index] = pixels_curr[index];
+     else
+      pixels_start[index] = pixel_off;
+    pixels_target[index] = fire_on;
     blend_start[index] = 0.0;
-    blend_in[index] = 500.0;
-    blend_out[index] = 1000.0;
+    int intime = random(300)+200;
+    blend_in[index] = intime;
+    blend_out[index] = intime+random(300)+200;
 
     processTargetBlending();    
 }
@@ -122,7 +125,7 @@ float offset = 0;
 
 void loop()
 {
-    float l_gain = 0.2;
+    float l_gain = 1;
     delay(TIME_STEP);
 
     calculate_flames();
