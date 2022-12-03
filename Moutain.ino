@@ -13,81 +13,142 @@
 
 #include <NeoPixelBus.h>
 
+const uint16_t PIXEL_COUNT = 148; 
+const uint8_t PIXEL_PIN = 2;
+const uint16_t TIME_STEP = 20;
 
-const int maxnum = 148;
+HslColor pixel_off(1,1,0);
 
-const uint16_t PixelCount = maxnum; // this example assumes 4 pixels, making it smaller will cause a failure
-const uint8_t PixelPin = 2;  // make sure to set this to the correct pin, ignored for Esp8266
+NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PIXEL_COUNT, PIXEL_PIN);
 
-#define colorSaturation 128
+HslColor pixels_curr[PIXEL_COUNT];
+HslColor pixels_target[PIXEL_COUNT];
+HslColor pixels_start[PIXEL_COUNT];
+float blend_start[PIXEL_COUNT];
+float blend_in[PIXEL_COUNT];
+float blend_out[PIXEL_COUNT];
 
-// three element pixels, in different order and speeds
-NeoPixelBus<NeoGrbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
-//NeoPixelBus<NeoRgbFeature, Neo400KbpsMethod> strip(PixelCount, PixelPin);
+HslColor addBlendHslColors(HslColor colors[], float alphas[]) {
+  float h = 0;
+  float s = 0;
+  float l = 0;
+  float alpha = 0;
 
-// For Esp8266, the Pin is omitted and it uses GPIO3 due to DMA hardware use.  
-// There are other Esp8266 alternative methods that provide more pin options, but also have
-// other side effects.
-// For details see wiki linked here https://github.com/Makuna/NeoPixelBus/wiki/ESP8266-NeoMethods.
+  for (int i = 0; i < PIXEL_COUNT; i++) {
+    h += colors[i].H;
+    s += colors[i].S;
+    l += colors[i].L;
+    alpha += alphas[i];
+  }
 
-// You can also use one of these for Esp8266, 
-// each having their own restrictions.
-//
-// These two are the same as above as the DMA method is the default.
-// NOTE: These will ignore the PIN and use GPI03 pin.
-//NeoPixelBus<NeoGrbFeature, NeoEsp8266Dma800KbpsMethod> strip(PixelCount, PixelPin);
-//NeoPixelBus<NeoRgbFeature, NeoEsp8266Dma400KbpsMethod> strip(PixelCount, PixelPin);
+  return HslColor(h/alpha, s/alpha, l/alpha);
+}
 
-// Uart method is good for the Esp-01 or other pin restricted modules.
-// for details see wiki linked here https://github.com/Makuna/NeoPixelBus/wiki/ESP8266-NeoMethods.
-// NOTE: These will ignore the PIN and use GPI02 pin.
-//NeoPixelBus<NeoGrbFeature, NeoEsp8266Uart1800KbpsMethod> strip(PixelCount, PixelPin);
-//NeoPixelBus<NeoRgbFeature, NeoEsp8266Uart1400KbpsMethod> strip(PixelCount, PixelPin);
+HslColor linearBlendHslColor(HslColor c_start, HslColor c_target, float start, float target) {
+  float alpha_target = (float)(-start)/(float)(target-start);
 
-// The bitbang method is really only good if you are not using WiFi features of the ESP.
-// It works with all but pin 16.
-//NeoPixelBus<NeoGrbFeature, NeoEsp8266BitBang800KbpsMethod> strip(PixelCount, PixelPin);
-//NeoPixelBus<NeoRgbFeature, NeoEsp8266BitBang400KbpsMethod> strip(PixelCount, PixelPin);
+  if (alpha_target < 0) alpha_target = 0;
+  if (alpha_target > 1) alpha_target = 1;
 
-// four element pixels, RGBW
-//NeoPixelBus<NeoRgbFeature, Neo800KbpsMethod> strip(PixelCount, PixelPin);
+  float alpha_start = 1-alpha_target;
 
-RgbColor red(226, 88, 34);
-RgbColor green(230, 41, 44);
-RgbColor blue(255, 165, 0);
-
-
-void setup()
-{
-    Serial.begin(115200);
-    while (!Serial); // wait for serial attach
-
-    Serial.println();
-    Serial.println("Initializing...");
-    Serial.flush();
-
-    // this resets all the neopixels to an off state
-    strip.Begin();
-    strip.Show();
-
-
-    Serial.println();
-    Serial.println("Running...");
+  return HslColor(
+    c_start.H*alpha_start + c_target.H*alpha_target,
+    c_start.S*alpha_start + c_target.S*alpha_target,
+    c_start.L*alpha_start + c_target.L*alpha_target
+  );
 }
 
 
+// HslColor linearBlendHslColorAlpha(HslColor c_start, HslColor c_target, float alpha_start) {
+
+//   if (alpha_start < 0) alpha_start = 0;
+//   if (alpha_start > 1) alpha_start = 1;
+
+//   float alpha_target = 1-alpha_start;
+
+//   return HslColor(
+//     c_start.H*alpha_start + c_target.H*alpha_target,
+//     c_start.S*alpha_start + c_target.S*alpha_target,
+//     c_start.L*alpha_start + c_target.L*alpha_target
+//   );
+// }
+
+void processTargetBlending() {
+  for (int i = 0; i < PIXEL_COUNT; i++) {
+    if (blend_in[i] <= 0) continue;
+
+    pixels_curr[i] = linearBlendHslColor(pixels_start[i], pixels_target[i], blend_start[i], blend_in[i]);
+
+
+    blend_start[i] = blend_start[i] - (float)TIME_STEP;
+    blend_in[i] = blend_in[i] -  (float)TIME_STEP;
+    blend_out[i] = blend_out[i] -  (float)TIME_STEP;
+
+    if (blend_in[i] <= 0) {
+      if (blend_out[i] > 0) {
+        blend_start[i] = blend_in[i];
+        blend_in[i] = blend_out[i];
+        blend_out[i] = 0;
+        pixels_start[i] = pixels_target[i];
+        pixels_target[i] = pixel_off;
+      } else {
+        blend_start[i] = 0;
+        blend_in[i] = 0;
+        blend_out[i] = 0;
+        pixels_start[i] = pixel_off;
+        pixels_target[i] = pixel_off;
+        pixels_curr[i] = pixel_off;
+      }
+    }
+  }
+}
+
+
+void setup() {
+  for (int i = 0; i < PIXEL_COUNT; i++) {
+    pixels_curr[i] = HslColor(0, 0, 0);
+    pixels_start[i] = HslColor(0, 0, 0);
+    pixels_target[i] = HslColor(0, 0, 0);
+    blend_in[i] = 0;
+    blend_out[i] = 0;
+  }
+  strip.Begin();
+  for (int i=0; i< PIXEL_COUNT; i++) {
+      strip.SetPixelColor(i, pixels_curr[i]);
+    }
+  strip.Show();
+}
+
+void calculate_flames() {
+    uint16_t index = random(PIXEL_COUNT);
+    // if (pixels_curr[index].L > 0)
+    //   pixels_start[index] = pixels_curr[index];
+    // else
+    pixels_start[index] = HslColor(1, 1, 0);
+    pixels_target[index] = HslColor(1, 1, 0.5);
+    blend_start[index] = 0.0;
+    blend_in[index] = 500.0;
+    blend_out[index] = 1000.0;
+
+    processTargetBlending();    
+}
+
+float offset = 0;
+
 void loop()
 {
-    delay(50);
+    float l_gain = 0.2;
+    delay(TIME_STEP);
 
-    for (int i=0; i< maxnum; i++) {
-      strip.SetPixelColor(i, RgbColor(random(255), random(255), random(255)));
+    calculate_flames();
+
+    for (int i=0; i< PIXEL_COUNT; i++) {
+      //HslColor col = linearBlendHslColorAlpha(HslColor(0,1,0.5), HslColor(1,1,0.5), (sin((float)i/(float)5+offset)+1.0)/2.0);
+      HslColor col = pixels_curr[i];
+      strip.SetPixelColor(i, HslColor(col.H, col.S, col.L*l_gain));
     }
     strip.Show();
 
-
-
-
-
-
+    offset += 0.1;
 }
