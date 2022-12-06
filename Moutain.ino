@@ -124,24 +124,45 @@ void calculate_flames() {
 }
 
 bool aButtonPressed = false;
+uint16_t button_press_time_ms = 0;
+float l_gain = 1;
+float l_gain_press_start = 1;
 bool fireMode = false;
+
+const float DIMMER_TRIGGER = 300.0;
+const float DIMMER_STEP = 0.005;
+const float MAX_DIMMER = 1.0;
+const float MIN_DIMMER = 0.01;
 
 void loop()
 {
-    float l_gain = analogRead(A0)/1023.0;
-    if (l_gain < 0.1) l_gain = 0.1;
-
-    //l_gain = (digitalRead(D2) == HIGH) ? 0.5 : 0.0;
-
-     if (digitalRead(D2) == LOW) {    
-      aButtonPressed = true;                   
-      delay(10);                   
+    // Button Down
+    if (digitalRead(D2) == LOW && aButtonPressed == false) {
+      aButtonPressed = true;
+      delay(10);
+      button_press_time_ms = 0;
+      l_gain_press_start = l_gain;
     }
 
-  if (digitalRead(D2) == HIGH && aButtonPressed == true) { 
-    aButtonPressed = false;  
-    fireMode = !fireMode;                                  
-  }
+    // Button Down Long Hold
+    if (aButtonPressed) button_press_time_ms += TIME_STEP;
+    if (button_press_time_ms >= DIMMER_TRIGGER) {
+      if (l_gain_press_start <= 0.5) {
+        l_gain += DIMMER_STEP;
+        if (l_gain > MAX_DIMMER) l_gain = MAX_DIMMER;
+      } else {
+        l_gain -= DIMMER_STEP;
+        if (l_gain < MIN_DIMMER) l_gain = MIN_DIMMER;
+      }
+    }
+
+    // Button Up
+    if (digitalRead(D2) == HIGH && aButtonPressed == true) {
+      aButtonPressed = false;
+      if (button_press_time_ms < DIMMER_TRIGGER) {
+        fireMode = !fireMode;
+      }
+    }
 
     if (fireMode) { 
       calculate_flames();
@@ -156,6 +177,5 @@ void loop()
     }
     
     strip.Show();
-
     delay(TIME_STEP);
 }
